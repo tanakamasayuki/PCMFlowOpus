@@ -1,0 +1,26 @@
+{
+  "name": "PCMFlowOpus",
+  "version": "0.1.0",
+  "description": "Opus codec add-on for PCMFlow, focused on real-time voice (VoIP, ESP-NOW transceivers). Wraps Xiph.Org's libopus and exposes OpusEncoder / OpusDecoder via PCMFlow's PCMSink / PCMSource interfaces. Operates on raw Opus packets; Ogg/Opus container support is deferred.",
+  "keywords": "audio, opus, codec, voip, esp-now, esp32, pcmflow",
+  "authors": [
+    {
+      "name": "TANAKA Masayuki",
+      "maintainer": true
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tanakamasayuki/PCMFlowOpus.git"
+  },
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "*",
+  "headers": "PCMFlowOpus.h",
+  "dependencies": [
+    {
+      "name": "PCMFlow",
+      "owner": "tanakamasayuki"
+    }
+  ]
+}

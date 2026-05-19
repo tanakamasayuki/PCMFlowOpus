@@ -1,0 +1,28 @@
+# PCMFlowOpus — pinned upstream versions
+#
+# Records the exact upstream tag and tarball SHA256 of every vendored
+# library. `tools/sync_opus.py` reads this file to detect drift and to
+# rebuild `src/external/opus/` reproducibly.
+#
+# Format (TOML-ish, parsed line-by-line; do not add free comments inside
+# a [section]):
+#
+#   [<project>]
+#   repo     = "xiph/<project>"
+#   tag      = "v<version>"
+#   url      = "https://codeload.github.com/xiph/<project>/tar.gz/refs/tags/<tag>"
+#   sha256   = "<lowercase hex digest of the tarball, 64 chars>"
+#   synced   = "YYYY-MM-DD"  # the day sync_opus.py wrote this section
+#
+# This file is the source of truth. The vendored tree in `opus/` MUST
+# match what the recorded tag would produce; CI is expected to verify
+# this on every push.
+
+[opus]
+repo     = "xiph/opus"
+tag      = ""
+url      = ""
+sha256   = ""
+synced   = ""
+# NOTE: the initial pin will be filled in by the first run of
+# `python tools/sync_opus.py --apply` (script not yet implemented).

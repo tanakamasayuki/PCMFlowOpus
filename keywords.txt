@@ -1,0 +1,39 @@
+#######################################
+# Syntax Coloring Map for PCMFlowOpus
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+OpusEncoder	KEYWORD1
+OpusDecoder	KEYWORD1
+OpusApplication	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+end	KEYWORD2
+encodeFrame	KEYWORD2
+decodePacket	KEYWORD2
+decodePacketFec	KEYWORD2
+setBitrate	KEYWORD2
+setComplexity	KEYWORD2
+setFrameDuration	KEYWORD2
+setDtx	KEYWORD2
+setInbandFec	KEYWORD2
+setPacketLossPerc	KEYWORD2
+format	KEYWORD2
+isReady	KEYWORD2
+isEof	KEYWORD2
+lastError	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+Voip	LITERAL1
+Audio	LITERAL1
+LowDelay	LITERAL1

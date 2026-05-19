@@ -1,0 +1,6 @@
+# Placeholder so the directory exists in git.
+#
+# This directory will be populated by `python tools/sync_opus.py --apply`
+# with the verbatim subset of xiph/opus listed in SPEC.md §"Vendored
+# upstream". The sync script is not implemented yet, so this directory
+# is intentionally empty in the scaffolding commit.
