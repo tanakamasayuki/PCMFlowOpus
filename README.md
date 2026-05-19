@@ -96,17 +96,18 @@ Pinned versions: [src/external/UPSTREAM.lock](src/external/UPSTREAM.lock)
 
 ### Updating upstream
 
-Vendored sources are kept in sync with **Xiph.Org GitHub tags** (the source of the official `opus-codec.org` tarballs). The intended workflow:
+Vendored sources track **Xiph.Org GitHub tags** (the same source as the official `opus-codec.org` tarballs). Automation level is **L1 — notify only**: a weekly GitHub Actions job ([`.github/workflows/upstream-check.yml`](.github/workflows/upstream-check.yml)) detects new tags and files a tracking issue. The actual sync is run by a maintainer locally:
 
 ```sh
-# Check for newer tags upstream (no changes made)
+# Print current / latest tag and a release-notes URL (no changes made)
 python tools/sync_opus.py --check-upstream
 
-# Apply: re-fetch tarball, overwrite src/external/opus/, rewrite UPSTREAM.lock
-python tools/sync_opus.py --apply
+# Apply: re-fetch tarball, repopulate src/external/opus/, rewrite UPSTREAM.lock
+python tools/sync_opus.py --apply                  # latest non-pre-release tag
+python tools/sync_opus.py --apply --tag v1.6.1     # pin a specific tag
 ```
 
-> The `sync_opus.py` script and its companion CI workflow are **not implemented yet**. The automation level (L1 = notify-only / L2 = auto-PR) will be decided before the first release — see [SPEC.md §"Release workflow"](SPEC.md#release-workflow) for the design.
+Rationale for L1 (and not auto-PR / auto-release): see [SPEC.md §"Release workflow"](SPEC.md#release-workflow).
 
 ---
 

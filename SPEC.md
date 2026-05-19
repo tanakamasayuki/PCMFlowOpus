@@ -187,31 +187,40 @@ License: BSD-3-Clause. Full credits and license text: [src/external/LICENSE_opus
 
 ## 9. Release workflow {#release-workflow}
 
-Two automation levels are under consideration. **The decision is deferred** until just before the first release.
+PCMFlowOpus adopts **automation level L1 — notify only** for upstream tracking. The release of PCMFlowOpus itself is fully automated, but pulling new upstream `libopus` versions is **deliberately manual**.
 
-### L1 — notify only
+### L1 — notify only (adopted)
 
-A weekly GitHub Actions job checks `git ls-remote --tags` for `xiph/opus` against `UPSTREAM.lock` and opens an Issue if a new tag exists. A maintainer runs `python tools/sync_opus.py --apply` locally, tests, commits, and tags.
+[`.github/workflows/upstream-check.yml`](.github/workflows/upstream-check.yml) runs weekly. It calls `tools/sync_opus.py --check-upstream`, which queries `xiph/opus`'s tags via the GitHub API and compares the latest non-pre-release tag with the `tag` field in [`src/external/UPSTREAM.lock`](src/external/UPSTREAM.lock). On a new tag, the workflow opens (or refreshes) an issue:
 
-Pros: minimal CI surface; every step is human-reviewed.
-Cons: every upstream bump is manual labor.
+```
+chore: bump vendored libopus to v<new>
+```
 
-### L2 — auto-PR
+The body links to the upstream release notes and lists the next steps. A maintainer then runs locally:
 
-Same detection, plus the workflow runs `sync_opus.py --apply`, host pytest, and `arduino-cli compile --fqbn esp32:esp32:esp32` for the test sketches; if all green, opens a pull request. A maintainer reviews the diff and merges. Tag/release is then driven by the existing release workflow (mirrored from parent PCMFlow's `.github/workflows/release.yml`).
+```sh
+python tools/sync_opus.py --apply         # latest non-pre-release tag
+python tools/sync_opus.py --apply --tag v1.6.1   # pin a specific tag
+```
 
-Pros: drift is caught weekly; no human step until the merge button.
-Cons: host pytest cannot catch ESP32-runtime regressions or codec-quality regressions; reviewer must still read upstream release notes.
+The script downloads the tarball from `codeload.github.com`, verifies SHA256, wipes `src/external/opus/` (preserving `.gitkeep`), populates it with the filtered subset listed in §7, and rewrites `UPSTREAM.lock`. The maintainer then tests locally, commits, and triggers the release workflow (§"Final release tagging").
+
+**Why L1, not L2 (auto-PR with host pytest + ESP32 compile)?**
+- We don't yet have a baseline for how often upstream ships (libopus tends to be a few releases per year, but the cadence shifts).
+- Host pytest cannot catch ESP32-runtime regressions or codec-quality regressions; an auto-PR with green CI gives false confidence.
+- The upstream release notes need to be read once per bump for `dnn/` additions, file-layout changes, and license deltas. Doing that read-through outside the merge-button moment is preferable.
+- The detection logic written for L1 is exactly what L2 would also use. L1 → L2 is a small additive change (add an `--apply` step, run pytest, swap `gh issue create` for `peter-evans/create-pull-request`).
+
+**When to revisit L2:** if the L1 issue rate exceeds ~6/year and the maintainer would like to skip the "click apply, run pytest" loop, promote to L2. Until then, keep things human-paced.
 
 ### Why not L3 (full auto-release)
 
-Host pytest passing does not guarantee absence of audio-quality regression, ESP32 runtime correctness, stability of file-extraction globs against upstream layout changes, or license consistency of newly-added upstream files (especially `dnn/` in 1.5+). A human reading the upstream release notes once per bump is cheap insurance.
+Even if L2 were adopted, host pytest passing would not guarantee absence of audio-quality regression, ESP32 runtime correctness, stability of file-extraction globs against upstream layout changes, or license consistency of newly-added upstream files (especially `dnn/` in 1.5+). A human reading the upstream release notes once per bump is cheap insurance.
 
 ### Final release tagging
 
-In all modes, version bumps and the Arduino Library Manager tag are produced by `tools/bump_version.py` (copied verbatim from parent PCMFlow), driven by a `release.yml` patterned on the parent. PCMFlowOpus's `version=` and `Unreleased` CHANGELOG section move together, identically to PCMFlow.
-
-`sync_opus.py` and the upstream-sync workflow are **not implemented yet**.
+Independent of upstream sync, the **PCMFlowOpus** release itself is fully automated: version bumps and the Arduino Library Manager tag are produced by `tools/bump_version.py` (copied verbatim from parent PCMFlow), driven by [`.github/workflows/release.yml`](.github/workflows/release.yml) (also mirrored from parent). PCMFlowOpus's `version=` and `Unreleased` CHANGELOG section move together, identically to PCMFlow. The maintainer triggers it via `workflow_dispatch` after merging an upstream-sync commit (or any other change worth releasing).
 
 ## 10. Testing {#testing}
 

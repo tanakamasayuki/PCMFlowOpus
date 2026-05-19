@@ -187,38 +187,47 @@ Vendor ルール:
 
 ## 9. リリースフロー {#リリースフロー}
 
-2 つの自動化レベルを比較中。**結論は初回リリース直前まで保留**する。
+PCMFlowOpus は上流追随の自動化レベルとして **L1 — 通知のみ** を採用する。PCMFlowOpus 自体のリリースは完全自動だが、上流 `libopus` の取り込みは**意図的に手動**にする。
 
-### L1 — 通知のみ
+### L1 — 通知のみ(採用)
 
-週次 GitHub Actions で `git ls-remote --tags` を `UPSTREAM.lock` と照合し、新 tag があれば Issue を起票する。`python tools/sync_opus.py --apply` の実行・テスト・commit・tag 付けはメンテナが手作業で行う。
+[`.github/workflows/upstream-check.yml`](.github/workflows/upstream-check.yml) が週次で動作。`tools/sync_opus.py --check-upstream` を呼び、GitHub API で `xiph/opus` の tag を取得して最新の非 pre-release tag と [`src/external/UPSTREAM.lock`](src/external/UPSTREAM.lock) の `tag` フィールドを比較する。新 tag があれば Issue を起票(または既存を更新):
 
-利点: CI 領域が最小、すべて人が判断。
-欠点: 上流更新ごとに手作業が発生。
+```
+chore: bump vendored libopus to v<new>
+```
 
-### L2 — 自動 PR
+本文には上流リリースノートへのリンクと次のアクションを記載。メンテナはローカルで以下を実行:
 
-検出までは L1 と同じ。続けて `sync_opus.py --apply` + host pytest + `arduino-cli compile --fqbn esp32:esp32:esp32` をワークフローで実行し、全部緑なら自動でプルリクエストを作成。merge は人。merge 後の tag/release は親 PCMFlow の `.github/workflows/release.yml` を移植した release ワークフローが処理する。
+```sh
+python tools/sync_opus.py --apply                # 最新の非 pre-release tag
+python tools/sync_opus.py --apply --tag v1.6.1   # 特定 tag を指定
+```
 
-利点: 上流ドリフトを週次で捕捉、merge ボタンまで人手ゼロ。
-欠点: host pytest では ESP32 ランタイム回帰や音質回帰を捕まえられない。レビューア側で上流リリースノートに目を通す必要は残る。
+スクリプトは `codeload.github.com` から tarball を取得し SHA256 を検証、`src/external/opus/`(`.gitkeep` を保護)を一旦消してから §7 の抽出ルールで再展開、`UPSTREAM.lock` を更新する。メンテナはローカルでテスト → commit → release ワークフロー(§「最終リリースのタグ付け」)を起動する。
+
+**なぜ L2(自動 PR + host pytest + ESP32 ビルドチェック)ではないか:**
+- 上流のリリース頻度の体感がまだない(libopus は年数回程度だがペースは変動)
+- host pytest では ESP32 ランタイム回帰や音質回帰を捕まえられず、CI 緑が false confidence になる
+- 上流リリースノートは bump ごとに 1 回読む必要がある(`dnn/` 追加、配置変更、ライセンス差分)。merge ボタンの瞬間より、その読み合わせは別の場で行うほうがよい
+- L1 の検出ロジックは L2 でもそのまま使う。L1 → L2 は「`--apply` ステップを足し、pytest を回し、`gh issue create` を `peter-evans/create-pull-request` に差し替える」だけの加算的変更
+
+**L2 への昇格を検討するタイミング:** L1 の Issue が年 6 件を超えてきて「apply 押して pytest 回す手間を省きたい」と感じたら L2 へ。それまでは人間ペースを維持する。
 
 ### なぜ L3(完全自動リリース)を採らないか
 
-host pytest 緑だけでは以下を保証できない:
+仮に L2 を採用したとしても、host pytest 緑だけでは以下を保証できない:
 
-- 音質回帰の不在(440 Hz sine の通過 ≠ コーデック忠実性)
+- 音質回帰の不在(440 Hz sine 通過 ≠ コーデック忠実性)
 - ESP32 実機ランタイム正常性(host CI は Xtensa を走らせない)
 - ファイル抽出 glob の安定性(上流の配置変更で静かに空ヒットになり得る)
 - 新規ファイルのライセンス整合(特に 1.5+ の `dnn/` 配下)
 
-人がリリースノートを読む工程を 1 回挟む価値が、自動化の手間に十分見合う。
+人がリリースノートを読む工程を 1 回挟む価値が自動化の手間に十分見合う。
 
 ### 最終リリースのタグ付け
 
-どのレベルでも、バージョン bump と Arduino Library Manager 用 tag は `tools/bump_version.py`(親 PCMFlow から流用)で生成し、親同様の `release.yml` で駆動する。`version=` と CHANGELOG の `Unreleased` 節は同時に動く、親と同じ流儀。
-
-`sync_opus.py` および対応するワークフローは**現時点で未実装**。
+上流追随とは独立に、**PCMFlowOpus** 本体のリリースは完全自動: バージョン bump と Arduino Library Manager 用 tag は `tools/bump_version.py`(親 PCMFlow から流用)で生成し、[`.github/workflows/release.yml`](.github/workflows/release.yml)(これも親から移植)が駆動する。`version=` と CHANGELOG の `Unreleased` 節は同時に動く、親と同じ流儀。上流同期コミット(または他の変更)を merge した後、メンテナが `workflow_dispatch` で起動する。
 
 ## 10. テスト {#テスト}
 

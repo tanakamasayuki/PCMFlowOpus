@@ -1,0 +1,119 @@
+name: Upstream check — libopus
+
+# Weekly L1 (notify-only) check: query xiph/opus tags, compare with
+# src/external/UPSTREAM.lock, and open a tracking issue if a new
+# non-pre-release tag exists.
+#
+# The actual sync is run by the maintainer locally via
+# `python tools/sync_opus.py --apply` — see SPEC.md §"Release workflow".
+
+on:
+  schedule:
+    # Monday 06:00 UTC. The exact day doesn't matter; pick one quiet hour.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Query upstream tag
+        id: check
+        env:
+          # Raises GitHub API rate-limit ceiling from 60/h to 5000/h.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python tools/sync_opus.py --check-upstream | tee -a "$GITHUB_OUTPUT"
+
+      - name: Ensure label exists
+        if: steps.check.outputs.has_update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create upstream-sync \
+            --color 0E8A16 \
+            --description "Tracks an upstream libopus tag bump filed by upstream-check.yml" \
+            --force
+
+      - name: Open / refresh tracking issue
+        if: steps.check.outputs.has_update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.check.outputs.current_tag }}
+          LATEST: ${{ steps.check.outputs.latest_tag }}
+          NOTES_URL: ${{ steps.check.outputs.notes_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TITLE="chore: bump vendored libopus to ${LATEST}"
+
+          # Avoid creating duplicate issues for the same target tag.
+          existing="$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --label upstream-sync \
+            --search "${LATEST} in:title" \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          BODY_FILE="$(mktemp)"
+          {
+            echo "Upstream [xiph/opus](https://github.com/xiph/opus) has tagged"
+            echo "**${LATEST}**, which is newer than the version pinned in"
+            echo '`src/external/UPSTREAM.lock`'"."
+            echo
+            if [ -n "${CURRENT}" ]; then
+              echo "- Currently vendored: \`${CURRENT}\`"
+            else
+              echo "- Currently vendored: _(no tag pinned yet — initial sync)_"
+            fi
+            echo "- Latest upstream: \`${LATEST}\`"
+            echo "- Release notes: ${NOTES_URL}"
+            echo
+            echo "## Maintainer checklist"
+            echo
+            echo "Run these locally on a clean checkout:"
+            echo
+            echo '```sh'
+            echo "python tools/sync_opus.py --apply --tag ${LATEST}"
+            echo "cd tests && uv run --env-file .env pytest -q"
+            echo '```'
+            echo
+            echo "Before committing, also:"
+            echo
+            echo "- [ ] Read the upstream release notes for breaking changes."
+            echo "- [ ] Verify no new files landed under \`dnn/\` or other excluded paths."
+            echo "- [ ] Spot-check the \`src/external/opus/\` diff for unexpected file moves."
+            echo "- [ ] Confirm \`src/external/UPSTREAM.lock\` records the new tag and a"
+            echo "      non-empty SHA256."
+            echo
+            echo "Then commit and trigger the **Release** workflow."
+            echo
+            echo "<sub>Filed automatically by \`.github/workflows/upstream-check.yml\`.</sub>"
+          } > "$BODY_FILE"
+
+          if [ -n "$existing" ]; then
+            echo "Refreshing existing issue #${existing}"
+            gh issue edit "$existing" --repo "$REPO" \
+              --title "$TITLE" \
+              --body-file "$BODY_FILE"
+          else
+            echo "Filing new issue: $TITLE"
+            gh issue create --repo "$REPO" \
+              --title "$TITLE" \
+              --body-file "$BODY_FILE" \
+              --label upstream-sync
+          fi
