@@ -253,6 +253,7 @@ Captured here so they aren't lost; not in v0.1.x:
 - **Ogg/Opus container** (read and write). Useful only for desktop interop (Audacity / mpv / email attachment). Would add `xiph/opusfile` + `xiph/ogg` (read) and `xiph/libopusenc` (write) to the vendor set. Add as `PCMFlowOpusOgg.h` opt-in header when demand appears.
 - **OpusEncoder repacketization** (combine multiple frames into a single packet) — `opus_repacketizer` API. Useful for non-realtime archival; not for VoIP.
 - **Stereo bit-exact reference build** — float-point path. Out of scope while VoIP is the priority.
+- **Continuous packet-streaming through PCMFlow's `setInputSource()` hook.** PCMFlow's current `processChunk()` latches `srcEof_ = true` the first time `source->readFrames()` returns 0, regardless of `source->isEof()`. That makes the pull-model PCMSource interface incompatible with packet-driven sources that legitimately return 0 between packets. A one-line fix in PCMFlow (check `source->isEof()` before latching `srcEof_`) unblocks this. Until that ships, callers should use OpusDecoder's `decodePacket(pcm, max)` form directly and feed PCM to the application by another means; the single-packet integration via `setInputSource()` already works (see [tests/external_source/](tests/external_source/)).
 
 ## 13. License
 
