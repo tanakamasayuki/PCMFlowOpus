@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
-import fnmatch
 import hashlib
 import io
 import json
@@ -98,11 +97,16 @@ INCLUDE_GLOBS = [
 # Hard excludes — applied AFTER include filtering, to drop demo / test
 # sources that incidentally match the broad `src/*.c` rule above.
 EXCLUDE_GLOBS = [
+    # Demo / tool sources that ship inside src/ or celt/ alongside the
+    # real library files. These have unconditional main() entry points
+    # and must not be compiled into a downstream library.
     "src/opus_demo.c",
     "src/opus_compare.c",
+    "src/qext_compare.c",           # added in 1.6.x
     "src/repacketizer_demo.c",
     "src/mlp_train*.c",
     "src/mlp_train*.h",
+    "celt/opus_custom_demo.c",
     # The ML enhancement layer added in 1.5+. We disable it at compile
     # time via opus_config.h; excluding the sources keeps the vendor
     # tree smaller and the license inventory simpler.
@@ -111,6 +115,21 @@ EXCLUDE_GLOBS = [
     # SILK float path: we ship fixed-point only.
     "silk/float/*",
     "silk/float/**/*",
+    # Architecture-specific .c implementations. Their bodies are entirely
+    # guarded by macros (OPUS_ARM_MAY_HAVE_NEON, OPUS_X86_MAY_HAVE_SSE,
+    # __mips, HAVE_ARM_NE10, …) that opus_config.h leaves undefined for
+    # our default fixed-point, no-SIMD build. Arduino's recursive library
+    # build, however, compiles every .c file under src/ unconditionally —
+    # which means files like celt/arm/celt_fft_ne10.c try to #include
+    # external SIMD library headers (NE10_dsp.h, …) that we do not have.
+    # Drop the .c files; keep the .h files in place so a future build can
+    # opt-in to SIMD without re-vendoring.
+    "celt/arm/*.c",
+    "celt/x86/*.c",
+    "celt/mips/*.c",
+    "silk/arm/*.c",
+    "silk/x86/*.c",
+    "silk/mips/*.c",
 ]
 
 
@@ -247,21 +266,87 @@ def download(url: str) -> bytes:
         raise SystemExit(f"error: GET {url} -> {e.reason}")
 
 
+def _glob_to_regex(pattern: str) -> "re.Pattern[str]":
+    """Translate a glob to a regex where `*` does NOT cross '/'.
+
+    Python's stdlib `fnmatch.fnmatchcase` treats `*` as "any character
+    including '/'", which is wrong for path-style globs — it caused
+    `celt/*.c` to match `celt/tests/x.c`. This helper restores POSIX
+    glob semantics:
+
+        *   any run of non-'/' characters
+        ?   exactly one non-'/' character
+        **  any run of characters (including '/'), spanning directories
+    """
+    out: list[str] = []
+    i = 0
+    n = len(pattern)
+    while i < n:
+        c = pattern[i]
+        if c == "*":
+            if i + 1 < n and pattern[i + 1] == "*":
+                out.append(".*")
+                i += 2
+            else:
+                out.append("[^/]*")
+                i += 1
+        elif c == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(c))
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+
+_INCLUDE_RE = [_glob_to_regex(p) for p in INCLUDE_GLOBS]
+_EXCLUDE_RE = [_glob_to_regex(p) for p in EXCLUDE_GLOBS]
+
+
 def _path_keeps(rel: str) -> bool:
     rel = rel.replace(os.sep, "/")
-    for pat in EXCLUDE_GLOBS:
-        if fnmatch.fnmatchcase(rel, pat):
+    for r in _EXCLUDE_RE:
+        if r.match(rel):
             return False
-    for pat in INCLUDE_GLOBS:
-        if fnmatch.fnmatchcase(rel, pat):
+    for r in _INCLUDE_RE:
+        if r.match(rel):
             return True
     return False
+
+
+# Match the autoconf boilerplate that gates `#include "config.h"`. Upstream
+# uses three textual variants; we rewrite each to an unconditional `#if 1`
+# so the .c file unconditionally pulls in our hand-written opus_config.h
+# via the per-directory config.h shim. The transform is a single-line
+# substitution per match — easy to spot in a diff against upstream and
+# undone trivially by re-running the sync script.
+_HAVE_CONFIG_H_RE = re.compile(
+    r'^(\s*)#(\s*)(?:ifdef\s+HAVE_CONFIG_H'
+    r'|if\s+defined\s*\(\s*HAVE_CONFIG_H\s*\))\s*$',
+    re.MULTILINE,
+)
+
+
+def _force_config_h(text: str) -> tuple[str, int]:
+    """Rewrite HAVE_CONFIG_H gates to `#if 1`. Returns (new_text, n_subs)."""
+    new_text, n = _HAVE_CONFIG_H_RE.subn(
+        r'\1#\2if 1 /* PCMFlowOpus: forced via tools/sync_opus.py */',
+        text,
+    )
+    return new_text, n
 
 
 def extract_filtered(tar_bytes: bytes, dest_root: pathlib.Path) -> int:
     """Extract files matching INCLUDE_GLOBS minus EXCLUDE_GLOBS into dest_root.
 
     Returns the number of files written.
+
+    For every extracted .c file, also rewrites `#ifdef HAVE_CONFIG_H` (and
+    its `#if defined(HAVE_CONFIG_H)` variant) to `#if 1` so the autoconf
+    boilerplate that guards `#include "config.h"` always fires. Without
+    this rewrite the per-directory `config.h` shims would never be read,
+    and the FIXED_POINT / OPUS_BUILD / etc. macros from our hand-written
+    opus_config.h would not be visible to the compiler.
     """
     count = 0
     with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:gz") as tf:
@@ -298,9 +383,157 @@ def extract_filtered(tar_bytes: bytes, dest_root: pathlib.Path) -> int:
             fh = tf.extractfile(member)
             if fh is None:
                 continue
-            out_path.write_bytes(fh.read())
+            data = fh.read()
+            # Rewrite HAVE_CONFIG_H gates only in .c sources (.h files
+            # have the same pattern but are always included from a .c that
+            # has already gone through the rewrite).
+            if norm.endswith(".c"):
+                try:
+                    text = data.decode("utf-8")
+                except UnicodeDecodeError:
+                    out_path.write_bytes(data)
+                else:
+                    new_text, _ = _force_config_h(text)
+                    out_path.write_text(new_text, encoding="utf-8")
+            else:
+                out_path.write_bytes(data)
             count += 1
     return count
+
+
+# ---------------------------------------------------------------------------
+# Shim header generation
+#
+# libopus's source layout assumes an autotools build that hands the compiler
+# multiple `-I` paths (one per subdirectory: include/, celt/, silk/, src/,
+# silk/fixed/, plus the arch dirs). Arduino's recursive library layout only
+# adds `<library>/src` to the include path. That breaks cross-directory
+# bare-name includes such as:
+#
+#   src/opus_encoder.c   #include "celt.h"      (celt.h lives in celt/)
+#   celt/celt.c          #include "SigProc_FIX.h" (lives in silk/)
+#   *                    #include "config.h"    (would normally be autoconf-
+#                                                 generated; we substitute
+#                                                 our hand-written opus_config.h)
+#
+# Solution: for every subdirectory D in the vendored tree, write a one-line
+# shim header at D/<basename> for each cross-directory include that D's .c
+# and .h files reference. GCC's `#include "X"` resolution first searches the
+# directory of the file holding the #include, so the shim is found, and it
+# in turn references the real header by relative path.
+#
+# Shims are tracked along with the verbatim files inside src/external/opus/
+# and are wiped + regenerated on every `--apply` run.
+
+# Path to opus_config.h relative to the vendor root (src/external/opus/).
+# The shim generator computes the actual relative path from each shim's
+# parent directory to this target on the fly.
+CONFIG_H_RELATIVE_TO_VENDOR_ROOT = pathlib.PurePosixPath("../opus_config.h")
+
+_INCLUDE_RE_SCAN = re.compile(r'^[ \t]*#[ \t]*include[ \t]+"([^"]+)"', re.M)
+
+
+def _index_headers(root: pathlib.Path) -> dict[str, str]:
+    """Map every header's basename to its relative path inside `root`.
+
+    There are no basename collisions across libopus's tree (verified via
+    `find -name '*.h' | awk -F/ '{print $NF}' | sort -u | uniq -d`), so a
+    flat basename→path map is unambiguous.
+    """
+    out: dict[str, str] = {}
+    for h in root.rglob("*.h"):
+        rel = h.relative_to(root).as_posix()
+        out.setdefault(h.name, rel)
+    return out
+
+
+def _collect_includes(root: pathlib.Path) -> dict[str, set[str]]:
+    """Return {subdir_relative_to_root: set(include_string)} for the tree.
+
+    Subpath includes ("mips/foo.h") and bare names ("kiss_fft.h") are kept
+    intact in the set; the caller decides how to resolve each.
+    """
+    out: dict[str, set[str]] = {}
+    for src in list(root.rglob("*.c")) + list(root.rglob("*.h")):
+        rel = src.relative_to(root)
+        sdir = rel.parent.as_posix()
+        text = src.read_text(encoding="utf-8", errors="replace")
+        for inc in _INCLUDE_RE_SCAN.findall(text):
+            out.setdefault(sdir, set()).add(inc)
+    return out
+
+
+def _relpath(from_dir: pathlib.PurePosixPath, to_file: pathlib.PurePosixPath) -> str:
+    """Compute the relative path from `from_dir` (a directory) to `to_file`."""
+    return os.path.relpath(to_file.as_posix(), start=from_dir.as_posix())
+
+
+def _write_shim(shim_full: pathlib.Path, target_relpath: str) -> None:
+    shim_full.parent.mkdir(parents=True, exist_ok=True)
+    shim_full.write_text(
+        "/* Auto-generated by tools/sync_opus.py — do not edit. */\n"
+        f"#include \"{target_relpath}\"\n",
+        encoding="utf-8",
+    )
+
+
+def generate_shims(vendor_root: pathlib.Path) -> int:
+    """Generate per-subdirectory shim headers. Returns number of shims written.
+
+    For each #include "X" found in a vendored source file, place a shim at
+    `<source_dir>/X` whose body redirects to wherever X actually lives.
+    Subpath includes ("mips/foo.h") create shims at the corresponding nested
+    location; the relative path inside the shim is computed from the shim's
+    OWN directory, not the includer's directory (that was the bug in the
+    first cut — it produced self-referencing shims at nested locations).
+    """
+    headers = _index_headers(vendor_root)
+    includes_by_dir = _collect_includes(vendor_root)
+    written = 0
+
+    for sdir, includes in includes_by_dir.items():
+        sdir_path = pathlib.PurePosixPath(sdir)
+        for inc in includes:
+            inc_path = pathlib.PurePosixPath(inc)
+            shim_rel = sdir_path / inc_path
+            shim_full = vendor_root / shim_rel
+
+            # If the file already exists at the would-be shim path — either
+            # as a real vendored header or because two different source
+            # files referenced it via the same path — leave it alone.
+            if shim_full.exists():
+                continue
+
+            # Decide the target the shim should redirect to.
+            if inc == "config.h":
+                # config.h never exists in the vendored tree; it shims to
+                # the hand-written opus_config.h that sits ONE level above
+                # the vendor root.
+                target_abs = (vendor_root / CONFIG_H_RELATIVE_TO_VENDOR_ROOT).resolve()
+            else:
+                basename = inc_path.name
+                target_rel = headers.get(basename)
+                if target_rel is None:
+                    # Unresolved include — either dead under our config (e.g.
+                    # main_FLP.h while FIXED_POINT is set) or genuinely
+                    # missing. Either way, no shim is correct.
+                    continue
+                target_abs = (vendor_root / target_rel).resolve()
+
+            shim_dir_abs = shim_full.parent.resolve()
+            target_via = os.path.relpath(str(target_abs), start=str(shim_dir_abs))
+
+            # Final safety: refuse to write a shim that would reference
+            # itself (the relpath collapses to just the file's basename in
+            # the same dir). This can't happen with the corrected logic,
+            # but guard against future regressions.
+            if target_via == inc_path.name and shim_full.resolve() == target_abs:
+                continue
+
+            _write_shim(shim_full, target_via)
+            written += 1
+
+    return written
 
 
 def wipe_vendor_dir(path: pathlib.Path) -> None:
@@ -356,6 +589,10 @@ def cmd_apply(tag: str | None) -> int:
             "check INCLUDE_GLOBS in tools/sync_opus.py"
         )
     print(f"wrote {n} files into {LOCAL_VENDOR_DIR}/", file=sys.stderr)
+
+    print("generating cross-directory shim headers", file=sys.stderr)
+    shim_count = generate_shims(LOCAL_VENDOR_DIR)
+    print(f"wrote {shim_count} shim headers", file=sys.stderr)
 
     write_lock(tag=tag, url=url, sha256=sha)
     print(f"updated {LOCK_PATH} -> tag={tag}", file=sys.stderr)

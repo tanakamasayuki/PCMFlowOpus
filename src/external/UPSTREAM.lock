@@ -20,9 +20,7 @@
 
 [opus]
 repo     = "xiph/opus"
-tag      = ""
-url      = ""
-sha256   = ""
-synced   = ""
-# NOTE: the initial pin will be filled in by the first run of
-# `python tools/sync_opus.py --apply` (script not yet implemented).
+tag      = "v1.6.1"
+url      = "https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v1.6.1"
+sha256   = "bf0b97ec7a65890b8db90ef94c4d6c18de12584c3085031953a10986f5917745"
+synced   = "2026-05-22"

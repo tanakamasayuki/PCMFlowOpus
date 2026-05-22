@@ -75,7 +75,16 @@ sync script.
 
 ## Opus Patent License
 
-Opus is also covered by a separate **royalty-free patent license** issued
-by Xiph.Org, Microsoft, Skype, Broadcom, and others. The text is
-included upstream as `opus/PATENTS`. PCMFlowOpus inherits this license
-unchanged — downstream users do not need to do anything special.
+Opus is also covered by **royalty-free patent licenses** issued by
+Xiph.Org, Microsoft, Skype, Broadcom, and others. As of libopus 1.6.x
+the IPR statements are no longer shipped as a single `PATENTS` file;
+instead, [`opus/LICENSE_PLEASE_READ.txt`](opus/LICENSE_PLEASE_READ.txt)
+lists the official IETF IPR statement URLs from each contributor:
+
+- Xiph.Org Foundation — <https://datatracker.ietf.org/ipr/1524/>
+- Microsoft Corporation — <https://datatracker.ietf.org/ipr/1914/>
+- Skype Limited — <https://datatracker.ietf.org/ipr/1602/>
+- (and others — see the file for the full list)
+
+PCMFlowOpus inherits these licenses unchanged. Downstream users do not
+need to do anything special.

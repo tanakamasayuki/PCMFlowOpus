@@ -45,13 +45,19 @@
 #define HAVE_LRINT  1
 
 // --- Architecture intrinsics ---------------------------------------
-// Disabled by default. Enable selectively after measuring.
-#define OPUS_ARM_MAY_HAVE_NEON     0
-#define OPUS_ARM_MAY_HAVE_NEON_INTR 0
-#define OPUS_X86_MAY_HAVE_SSE      0
-#define OPUS_X86_MAY_HAVE_SSE2     0
-#define OPUS_X86_MAY_HAVE_SSE4_1   0
-#define OPUS_X86_MAY_HAVE_AVX2     0
+// libopus tests these with `#if defined(OPUS_*_MAY_HAVE_*)`, which is
+// true whenever the macro is defined REGARDLESS of value. To keep the
+// SIMD paths disabled the macros must be LEFT UNDEFINED, not defined
+// to zero. Equivalent of autoconf's `/* #undef OPUS_*_MAY_HAVE_* */`.
+// (Enable selectively per-target by uncommenting and pairing with the
+//  corresponding RTCD / PRESUME macros.)
+//
+// #define OPUS_ARM_MAY_HAVE_NEON
+// #define OPUS_ARM_MAY_HAVE_NEON_INTR
+// #define OPUS_X86_MAY_HAVE_SSE
+// #define OPUS_X86_MAY_HAVE_SSE2
+// #define OPUS_X86_MAY_HAVE_SSE4_1
+// #define OPUS_X86_MAY_HAVE_AVX2
 
 // --- Feature gating ------------------------------------------------
 // CELT analysis improves audio mode quality; SILK is the speech side
