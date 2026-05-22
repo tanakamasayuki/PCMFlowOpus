@@ -81,6 +81,16 @@ public:
 private:
     struct Impl;
 
+    // Shared body for decodePacket() and decodePacketFec(): both calls
+    // bottom out in libopus's opus_decode() with different decode_fec
+    // flags. pcm=nullptr + maxFrames=0 routes the decoded samples into
+    // an internal buffer for later retrieval via the PCMSource path.
+    size_t decodeShared_(const uint8_t *packet,
+                         size_t packetBytes,
+                         int16_t *pcm,
+                         size_t maxFrames,
+                         int decode_fec);
+
     Impl *impl_ = nullptr;
     PCMFormat format_{};
     bool ready_ = false;
