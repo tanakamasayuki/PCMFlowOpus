@@ -260,7 +260,6 @@ SemVer (`major.minor.patch`)を `library.properties`、`library.json`、`src/pcm
 - **Ogg/Opus コンテナ**(読み書き)。デスクトップ相互運用(Audacity / mpv / メール添付)用途専用。`xiph/opusfile` + `xiph/ogg`(読み)、`xiph/libopusenc`(書き)を vendor に追加。需要が出たら `PCMFlowOpusOgg.h` の opt-in ヘッダとして実装する。
 - **OpusEncoder の repacketization**(複数フレームを 1 パケットへ結合)— `opus_repacketizer` API。非リアルタイム保存向け。VoIP には不要。
 - **Bit-exact reference 用 float-point ビルド** — VoIP 優先のため初版対象外。
-- **PCMFlow `setInputSource()` 経由の継続的パケットストリーミング。** 親 PCMFlow の `processChunk()` は `source->readFrames()` が 0 を返した瞬間に `srcEof_ = true` を立て、`source->isEof()` を確認しない。これにより「パケット間で一時的に空」になるストリーミング型 PCMSource を扱えない。親側に 1 行修正(`srcEof_` を立てる前に `source->isEof()` を確認)を入れれば解消する。それまでは、利用側は `decodePacket(pcm, max)` 形式を直接呼んで PCM をアプリ側で渡す運用とする。**単一パケット**経路の `setInputSource()` 統合は現状で動作する([tests/external_source/](tests/external_source/) 参照)。
 
 ## 13. ライセンス
 
