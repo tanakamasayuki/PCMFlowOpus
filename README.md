@@ -10,12 +10,6 @@ See [SPEC.md](SPEC.md) for the full specification.
 
 ---
 
-## Status
-
-**Pre-release / scaffolding.** Repository layout, documentation, and the vendor/release plan are in place. The encoder / decoder implementations and the upstream-sync tooling are not yet wired in. See [CHANGELOG.md](CHANGELOG.md).
-
----
-
 ## What's inside
 
 | Class | Direction | Carrier | Interface |
@@ -58,7 +52,7 @@ void onEspNowRecv(const uint8_t *mac, const uint8_t *data, int len) {
 }
 ```
 
-End-to-end transceiver sketch (mic ↔ ESP-NOW ↔ DAC) lives in [examples/EspNowTransceiver/](examples/EspNowTransceiver/) (placeholder for now).
+End-to-end transceiver sketch (mic ↔ ESP-NOW ↔ speaker) lives in [examples/EspNowTransceiver/](examples/EspNowTransceiver/). M5Stack Core2 speaker playback examples use [PCMFlowDevice](https://github.com/tanakamasayuki/PCMFlowDevice) for buffered `M5.Speaker` output.
 
 ---
 

@@ -9,10 +9,6 @@ Automated test suite for PCMFlowOpus. Mirrors the conventions of the parent [PCM
 - Per-feature subdirectory containing `<feature>.ino`, `sketch.yaml`, `test_<feature>.py`, and an `input/` directory of fixtures.
 - Assertions use the `EXPECT_TRUE` / `EXPECT_EQ` / `EXPECT_NEAR` macros and the `TEST done N/M` Serial protocol.
 
-## Status
-
-**Scaffolding.** Smoke test is in place; per-codec test directories contain placeholder sketches that the Python side currently asserts only for "TEST start" + "TEST done". The real assertions land when the encoder / decoder implementations do.
-
 ## Directory layout
 
 - `smoke/` — Template smoke test (host profile). Verifies the test infrastructure itself.

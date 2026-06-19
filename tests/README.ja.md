@@ -9,10 +9,6 @@ PCMFlowOpus 自動テストスイート。親 [PCMFlow のテスト規約](https
 - 機能ごとのディレクトリに `<feature>.ino` / `sketch.yaml` / `test_<feature>.py` / `input/` fixture
 - アサーション形式は `EXPECT_TRUE` / `EXPECT_EQ` / `EXPECT_NEAR` マクロ、Serial 経由の `TEST done N/M` プロトコル
 
-## ステータス
-
-**雛形整備中。** smoke テストは動く形にしている。各コーデックのディレクトリはプレースホルダの sketch を置いてあり、Python 側のアサーションは現状 "TEST start" + "TEST done" のみ。本物のアサーションはエンコーダ/デコーダ実装と同時に入る。
-
 ## ディレクトリ構成
 
 - `smoke/` — テンプレート smoke テスト(host プロファイル)。テスト基盤自体の動作確認。

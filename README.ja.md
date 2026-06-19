@@ -10,12 +10,6 @@ Xiph.Org の `libopus` リファレンス実装を vendor し、PCMFlow の `PCM
 
 ---
 
-## ステータス
-
-**プレリリース / 雛形整備中。** リポジトリ構成・ドキュメント・vendor / リリース計画は整っている。エンコーダ / デコーダ本体と上流同期スクリプトは未実装。[CHANGELOG.md](CHANGELOG.md) 参照。
-
----
-
 ## 構成
 
 | クラス | 方向 | 担い手 | インタフェース |
@@ -58,7 +52,7 @@ void onEspNowRecv(const uint8_t *mac, const uint8_t *data, int len) {
 }
 ```
 
-エンドツーエンドのトランシーバスケッチ(マイク↔ESP-NOW↔DAC)は [examples/EspNowTransceiver/](examples/EspNowTransceiver/) に同梱予定。
+エンドツーエンドのトランシーバスケッチ(マイク↔ESP-NOW↔speaker)は [examples/EspNowTransceiver/](examples/EspNowTransceiver/) に同梱。M5Stack Core2 の speaker 再生サンプルでは、buffered `M5.Speaker` 出力に [PCMFlowDevice](https://github.com/tanakamasayuki/PCMFlowDevice) を使う。
 
 ---
 
