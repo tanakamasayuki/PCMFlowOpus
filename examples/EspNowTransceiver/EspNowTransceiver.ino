@@ -13,7 +13,7 @@
 //   esp_now_recv_cb           (queues packet bytes)
 //     -> OpusDecoder.decodePacket(pcm=nullptr)   (queues 320 PCM samples)
 //     -> PCMFlow.setInputSource(dec) + pump()    (rate / format / ring buffer)
-//     -> readFrames -> M5.Speaker.playRaw()
+//     -> readFrames -> M5SpeakerBufferedPlayer
 //
 // Bitrate / frame size:
 //   16 kHz mono, 20 ms -> ~60 byte/packet @ 24 kbps. Each ESP-NOW frame
@@ -28,6 +28,7 @@
 
 #include <M5Unified.h>
 #include <PCMFlow.h>
+#include <PCMFlowDeviceM5.h>
 #include <PCMFlowOpus.h>
 
 #include <esp_now.h>
@@ -38,7 +39,9 @@
 static constexpr uint32_t kRate     = 16000;
 static constexpr uint8_t  kChannels = 1;
 static constexpr size_t   kFrame    = 320;     // 20 ms @ 16 kHz
+static constexpr size_t   kMaxPlayFrames = (kRate * 80u) / 1000u;
 static constexpr int      kBitrate  = 24000;   // 24 kbps Opus
+using Player = M5SpeakerBufferedPlayer<kMaxPlayFrames>;
 
 // ---- ESP-NOW --------------------------------------------------------------
 static const uint8_t kBroadcastMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -108,6 +111,7 @@ static PCMFlow      audio;     // receive-side pipeline
 static OpusEncoder  enc;
 static OpusDecoder  dec;
 static M5MicSource  mic;
+static Player       player;
 
 static void showStatus(const char *text, uint16_t color = TFT_DARKGREY)
 {
@@ -161,6 +165,12 @@ void setup()
     audio.setOutputFormat({kRate, kChannels, 16});
     audio.setBufferFrames(1024);   // ~64 ms of jitter slack
 
+    if (!player.begin({kRate, kChannels, 16}, Player::stableProfile())) {
+        Serial.println("M5SpeakerBufferedPlayer.begin failed");
+        showStatus("PLAYER NG", TFT_RED);
+        return;
+    }
+
     showStatus("listen — hold A to talk");
     Serial.printf("Ready. MAC=%s\n", WiFi.macAddress().c_str());
 }
@@ -193,10 +203,7 @@ static void doListen()
             audio.pump();
             const size_t got = audio.readFrames(out, kFrame);
             if (got == 0) break;
-            // playRaw expects sample count, not frame count. For mono
-            // they happen to be equal.
-            while (!M5.Speaker.playRaw(out, got, kRate, /*stereo=*/false))
-                delay(1);
+            player.writeFrames(out, got);
         }
     }
 }
