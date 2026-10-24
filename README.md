@@ -10,6 +10,8 @@ See [SPEC.md](SPEC.md) for the full specification.
 
 ---
 
+Start with the [example workflow](docs/GUIDE_EXAMPLES.md) and [individual example READMEs](examples/README.md) for setup, API sequence, verification and adaptation notes.
+
 ## What's inside
 
 | Class | Direction | Carrier | Interface |

@@ -168,8 +168,9 @@ PCMFlowOpus/
    └─ workflows/             # not implemented yet — see §"Release workflow"
 ```
 
-## 8. Vendored upstream {#vendored-upstream}
+<a id="vendored-upstream"></a>
 
+## 8. Vendored upstream
 Only one upstream project is vendored in the initial release:
 
 | Project | Upstream | License | Role |
@@ -185,8 +186,9 @@ Vendoring rules:
 
 License: BSD-3-Clause. Full credits and license text: [src/external/LICENSE_opus.md](src/external/LICENSE_opus.md).
 
-## 9. Release workflow {#release-workflow}
+<a id="release-workflow"></a>
 
+## 9. Release workflow
 PCMFlowOpus adopts **automation level L1 — notify only** for upstream tracking. The release of PCMFlowOpus itself is fully automated, but pulling new upstream `libopus` versions is **deliberately manual**.
 
 ### L1 — notify only (adopted)
@@ -222,8 +224,9 @@ Even if L2 were adopted, host pytest passing would not guarantee absence of audi
 
 Independent of upstream sync, the **PCMFlowOpus** release itself is fully automated: version bumps and the Arduino Library Manager tag are produced by `tools/bump_version.py` (copied verbatim from parent PCMFlow), driven by [`.github/workflows/release.yml`](.github/workflows/release.yml) (also mirrored from parent). PCMFlowOpus's `version=` and `Unreleased` CHANGELOG section move together, identically to PCMFlow. The maintainer triggers it via `workflow_dispatch` after merging an upstream-sync commit (or any other change worth releasing).
 
-## 10. Testing {#testing}
+<a id="testing"></a>
 
+## 10. Testing
 Same conventions as parent PCMFlow:
 
 - pytest-embedded + Arduino CLI backend.
@@ -246,8 +249,9 @@ Opus is **lossy**, so tolerances are generous compared to the near-exact match u
 
 SemVer (`major.minor.patch`) maintained in `library.properties`, `library.json`, and `src/pcmflowopus_version.h`. **Independent of** the PCMFlow version and **independent of** the bundled libopus version (which is recorded separately in `src/external/UPSTREAM.lock`). A new libopus pickup is normally a `patch` bump unless it changes the public API surface.
 
-## 12. Deferred features {#deferred-features}
+<a id="deferred-features"></a>
 
+## 12. Deferred features
 Captured here so they aren't lost; not in v0.1.x:
 
 - **Ogg/Opus container** (read and write). Useful only for desktop interop (Audacity / mpv / email attachment). Would add `xiph/opusfile` + `xiph/ogg` (read) and `xiph/libopusenc` (write) to the vendor set. Add as `PCMFlowOpusOgg.h` opt-in header when demand appears.

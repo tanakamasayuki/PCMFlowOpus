@@ -1,31 +1,5 @@
-// PCMFlowOpus example: EspNowTransceiver
-//
-// A half-duplex voice transceiver over ESP-NOW. Flash two M5Unified-
-// compatible boards (M5Stack Core2 / M5AtomEcho / M5StickC Plus / …)
-// with the same firmware. Holding button A on board A:
-//
-//   M5.Mic (16 kHz mono int16, 20 ms frames)
-//     -> OpusEncoder.encodeFrame()  (24 kbps Opus packet, ~60 byte)
-//     -> esp_now_send(broadcast)
-//
-// Whenever a packet arrives on board B (regardless of button state):
-//
-//   esp_now_recv_cb           (queues packet bytes)
-//     -> OpusDecoder.decodePacket(pcm=nullptr)   (queues 320 PCM samples)
-//     -> PCMFlow.setInputSource(dec) + pump()    (rate / format / ring buffer)
-//     -> readFrames -> M5SpeakerBufferedPlayer
-//
-// Bitrate / frame size:
-//   16 kHz mono, 20 ms -> ~60 byte/packet @ 24 kbps. Each ESP-NOW frame
-//   carries one Opus packet; the maximum ESP-NOW payload is 250 byte,
-//   so we are comfortably below the limit and could broadcast to many
-//   peers if desired.
-//
-// Requires:
-//   - PCMFlow >= 0.2.1     (for streaming-source `setInputSource()` fix)
-//   - PCMFlowOpus          (this library)
-//   - M5Unified            (any board with M5.Mic + M5.Speaker)
-
+// en: Exchange encoded voice between ESP-NOW peers
+// ja: ESP-NOWの相手と符号化した音声を交換する
 #include <M5Unified.h>
 #include <PCMFlow.h>
 #include <PCMFlowDeviceM5.h>
@@ -137,6 +111,8 @@ void setup()
     }
 
     M5.Mic.begin();
+    // en: Initialize this component after its prerequisites; inspect the returned status where provided.
+    // ja: 前提となる機器を準備してから初期化し、結果を返すAPIでは成否を確認します。
     if (!mic.begin()) {
         Serial.println("M5.Mic.begin failed");
         showStatus("MIC NG", TFT_RED);
@@ -179,9 +155,13 @@ static void doTalk()
 {
     // One 20 ms frame: capture -> encode -> broadcast.
     static int16_t pcm[kFrame];
+    // en: Use the actual returned frame count; bytes also depend on channel count and sample width.
+    // ja: 実際に返ったフレーム数を使います。Byte数にはチャンネル数とサンプル幅も関係します。
     if (mic.readFrames(pcm, kFrame) != kFrame) return;
 
     static uint8_t pkt[400];
+    // en: Encode one supported frame and use the actual encoded length.
+    // ja: 対応する1Frameを符号化し、実際の符号化長を使います。
     const size_t n = enc.encodeFrame(pcm, kFrame, pkt, sizeof(pkt));
     if (n == 0) return;
 
@@ -193,6 +173,8 @@ static void doListen()
     // Drain any queued ESP-NOW packets into the decoder.
     while (g_rxTail != g_rxHead) {
         RxPacket *slot = const_cast<RxPacket *>(&g_rxRing[g_rxTail]);
+        // en: Decode the actual packet length and inspect errors or available output.
+        // ja: 実際のPacket長で復号し、Errorや出力量を確認します。
         dec.decodePacket(slot->buf, slot->len, nullptr, 0);
         g_rxTail = (g_rxTail + 1) % kRxRingSlots;
 
@@ -200,9 +182,13 @@ static void doListen()
         // decoder's single-frame buffer with the next packet.
         static int16_t out[kFrame];
         while (true) {
+            // en: Advance decoding/conversion, then consume only the available returned PCM frames.
+            // ja: 復号／変換を進め、得られたPCM フレームだけを取り出します。
             audio.pump();
             const size_t got = audio.readFrames(out, kFrame);
             if (got == 0) break;
+            // en: Check the number accepted and retain any unconsumed tail; a frame is not a byte.
+            // ja: 受理量を確認し、残りを保持します。フレーム数とByte数は異なります。
             player.writeFrames(out, got);
         }
     }

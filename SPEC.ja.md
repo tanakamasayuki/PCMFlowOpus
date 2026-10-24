@@ -168,8 +168,9 @@ PCMFlowOpus/
    └─ workflows/             # 未実装、§「リリースフロー」参照
 ```
 
-## 8. Vendor している上流 {#vendor-している上流}
+<a id="vendor-している上流"></a>
 
+## 8. Vendor している上流
 初版で取り込む上流プロジェクトは 1 つだけ:
 
 | プロジェクト | 上流 | ライセンス | 役割 |
@@ -185,8 +186,9 @@ Vendor ルール:
 
 ライセンス: BSD-3-Clause。クレジットと全文は [src/external/LICENSE_opus.md](src/external/LICENSE_opus.md)。
 
-## 9. リリースフロー {#リリースフロー}
+<a id="リリースフロー"></a>
 
+## 9. リリースフロー
 PCMFlowOpus は上流追随の自動化レベルとして **L1 — 通知のみ** を採用する。PCMFlowOpus 自体のリリースは完全自動だが、上流 `libopus` の取り込みは**意図的に手動**にする。
 
 ### L1 — 通知のみ(採用)
@@ -229,8 +231,9 @@ python tools/sync_opus.py --apply --tag v1.6.1   # 特定 tag を指定
 
 上流追随とは独立に、**PCMFlowOpus** 本体のリリースは完全自動: バージョン bump と Arduino Library Manager 用 tag は `tools/bump_version.py`(親 PCMFlow から流用)で生成し、[`.github/workflows/release.yml`](.github/workflows/release.yml)(これも親から移植)が駆動する。`version=` と CHANGELOG の `Unreleased` 節は同時に動く、親と同じ流儀。上流同期コミット(または他の変更)を merge した後、メンテナが `workflow_dispatch` で起動する。
 
-## 10. テスト {#テスト}
+<a id="テスト"></a>
 
+## 10. テスト
 親 PCMFlow と同じ規約:
 
 - pytest-embedded + Arduino CLI バックエンド
@@ -253,8 +256,9 @@ Opus は**ロッシー**なので、PCMFlow `flac_decoder/` のニアリ完全�
 
 SemVer (`major.minor.patch`)を `library.properties`、`library.json`、`src/pcmflowopus_version.h` で同期管理。PCMFlow のバージョンとも、同梱 libopus のバージョン(`src/external/UPSTREAM.lock` に別記録)とも**独立**。新しい libopus 取り込みは API 変更を伴わない限り `patch` bump。
 
-## 12. 将来対応 {#将来対応}
+<a id="将来対応"></a>
 
+## 12. 将来対応
 忘れないようここに集約。v0.1.x には含めない:
 
 - **Ogg/Opus コンテナ**(読み書き)。デスクトップ相互運用(Audacity / mpv / メール添付)用途専用。`xiph/opusfile` + `xiph/ogg`(読み)、`xiph/libopusenc`(書き)を vendor に追加。需要が出たら `PCMFlowOpusOgg.h` の opt-in ヘッダとして実装する。

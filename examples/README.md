@@ -11,3 +11,13 @@ Sketches under this directory:
   - **Footprint**: ~1.4 MB flash (21 % of 6 MB), ~55 KB RAM (1 %). The bulk of flash is libopus.
 
 More examples can be added as needed (single-direction sender / receiver demos, WebSocket bridge to a browser, etc.).
+
+## Workflow and individual READMEs
+
+Start with the [example workflow](../docs/GUIDE_EXAMPLES.md), then choose the relevant sketch.
+
+A useful starting point is [EspNowTransceiver](EspNowTransceiver/README.md). Check its required hardware and choose another entry below if it does not match your setup.
+
+| Example | Learn |
+|---|---|
+| [EspNowTransceiver](EspNowTransceiver/README.md) | Exchange encoded voice between ESP-NOW peers |
